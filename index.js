@@ -5,14 +5,12 @@ const path = require('path');
 
 const app = express();
 const port = 3000;
-
 const genAI = new GoogleGenerativeAI(process.env.API_KEY);
 
 // Directory to store chat histories
 const historyDir = path.join(__dirname, 'history');
 
 app.use(express.json());
-
 
 // Function to convert image URLs to Gemini API Part objects
 function getImageParts(imageUrls) {
@@ -56,11 +54,9 @@ async function saveChatHistoryWithTimestamp(historyPath, chatHistory) {
 // Function to delete old chat history files
 async function deleteOldChatHistoryFiles() {
   const files = await fs.readdir(historyDir);
-
   files.forEach(async (file) => {
     const filePath = path.join(historyDir, file);
     const stats = await fs.stat(filePath);
-
     // Check if the file is older than 1 hour
     if (Date.now() - stats.birthtimeMs > 60 * 60 * 1000) {
       // Delete the file
@@ -73,6 +69,19 @@ async function deleteOldChatHistoryFiles() {
 // Schedule the deletion of old chat history files every hour
 setInterval(deleteOldChatHistoryFiles, 60 * 60 * 1000);
 
+// Function to clear chat history for a given chat ID
+async function clearChatHistory(chatid) {
+  const historyPath = path.join(historyDir, `${chatid}.json`);
+  try {
+    await fs.unlink(historyPath);
+    console.log(`Deleted chat history file: ${chatid}.json`);
+    return 'History cleared';
+  } catch (error) {
+    console.error(`Error deleting chat history: ${error}`);
+    return 'Error clearing history';
+  }
+}
+
 app.get('/gemini', async (req, res) => {
   try {
     const { query, chatid, ...imageUrls } = req.query;
@@ -80,6 +89,12 @@ app.get('/gemini', async (req, res) => {
     // Check if chatid is provided
     if (!chatid) {
       return res.status(400).json({ error: 'Chat ID (passcode) is required.' });
+    }
+
+    // Check for clear history queries
+    if (query.toLowerCase().match(/^(clear|clear history|clear chat)$/)) {
+      const response = await clearChatHistory(chatid);
+      return res.json({ response, chatid });
     }
 
     // Create directory if it doesn't exist
@@ -102,7 +117,7 @@ app.get('/gemini', async (req, res) => {
       model: 'gemini-pro',
       generationConfig: {
         maxOutputTokens: 1000, // Adjust based on your model and requirements
-        temperature: 0.7, // Experiment with temperature for diversity (lower for more focused, higher for more creative)
+        temperature: 0.7, // Experiment with temperature for diversity
         topP: 0.9, // Experiment with top-p for controlling randomness
       },
     });
@@ -112,7 +127,6 @@ app.get('/gemini', async (req, res) => {
 
     // Flatten the chat history array for use in countTokens and generateContentStream
     const flattenedChatHistory = chatHistory.flatMap(pair => pair);
-
     const totalTokens = await model.countTokens([...flattenedChatHistory, query, ...imageParts]);
     console.log('Total tokens:', totalTokens);
 
