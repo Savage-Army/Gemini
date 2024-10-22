@@ -7,12 +7,11 @@ const app = express();
 const port = 3000;
 const genAI = new GoogleGenerativeAI(process.env.API_KEY);
 
-// Directory to store chat histories
+
 const historyDir = path.join(__dirname, 'history');
 
 app.use(express.json());
 
-// Function to convert image URLs to Gemini API Part objects
 function getImageParts(imageUrls) {
   return Object.values(imageUrls).map((imageUrl, index) => {
     return {
@@ -97,10 +96,10 @@ app.get('/gemini', async (req, res) => {
       return res.json({ response, chatid });
     }
 
-    // Create directory if it doesn't exist
+ 
     await fs.mkdir(historyDir, { recursive: true });
 
-    // Path to the chat history JSON file
+
     const historyPath = path.join(historyDir, `${chatid}.json`);
 
     // Initialize or load chat history with timestamp
